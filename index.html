@@ -3,489 +3,56 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fast Ads - Telegram Mini App</title>
+  <title>Telegram Mini App Ads</title>
+
+  <!-- Load Onclicka TMA SDK -->
+  <script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
+
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      font-family: Arial, sans-serif;
+      background: #0f172a;
       color: white;
-      min-height: 100vh;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    
-    .container {
-      max-width: 500px;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-    }
-    
-    .header {
       text-align: center;
-      margin-bottom: 30px;
+      padding: 50px;
     }
-    
-    .logo {
-      font-size: 48px;
-      margin-bottom: 10px;
-    }
-    
     h1 {
-      font-size: 28px;
-      margin-bottom: 10px;
-      background: linear-gradient(90deg, #3b82f6, #a855f7);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    
-    .subtitle {
-      color: #cbd5e1;
-      font-size: 16px;
+      font-size: 22px;
       margin-bottom: 20px;
     }
-    
-    .stats {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      background: rgba(30, 41, 59, 0.7);
-      border-radius: 12px;
-      padding: 15px;
-      margin-bottom: 30px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .stat-item {
-      text-align: center;
-      flex: 1;
-    }
-    
-    .stat-value {
-      font-size: 24px;
-      font-weight: bold;
-      color: #a3e635;
-    }
-    
-    .stat-label {
-      font-size: 14px;
-      color: #94a3b8;
-    }
-    
-    .ad-section {
-      width: 100%;
-      margin-bottom: 30px;
-    }
-    
-    .ad-button {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: 20px;
-      background: linear-gradient(135deg, #2563eb, #3b82f6);
-      border: none;
-      border-radius: 12px;
+    button {
+      background: #1d4ed8;
       color: white;
-      font-size: 18px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      margin-bottom: 15px;
-    }
-    
-    .ad-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-      background: linear-gradient(135deg, #1d4ed8, #2563eb);
-    }
-    
-    .ad-button:active {
-      transform: translateY(0);
-    }
-    
-    .ad-button:disabled {
-      background: #475569;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-    
-    .ad-icon {
-      font-size: 24px;
-      margin-right: 15px;
-    }
-    
-    .ad-info {
-      text-align: center;
-    }
-    
-    .ad-title {
-      font-size: 18px;
-      margin-bottom: 4px;
-    }
-    
-    .ad-description {
-      font-size: 14px;
-      color: #e2e8f0;
-    }
-    
-    .ad-reward {
-      font-weight: bold;
-      color: #a3e635;
-    }
-    
-    .quick-actions {
-      display: flex;
-      gap: 10px;
-      width: 100%;
-      margin-bottom: 20px;
-    }
-    
-    .quick-btn {
-      flex: 1;
-      padding: 12px;
-      background: rgba(30, 41, 59, 0.7);
       border: none;
-      border-radius: 8px;
-      color: white;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .quick-btn:hover {
-      background: rgba(37, 99, 235, 0.2);
-    }
-    
-    .status-container {
-      width: 100%;
-      background: rgba(30, 41, 59, 0.7);
-      border-radius: 12px;
-      padding: 15px;
-      margin-top: 20px;
-      text-align: center;
-    }
-    
-    #status {
+      padding: 12px 25px;
       font-size: 16px;
-      color: #a3e635;
-      min-height: 24px;
-      transition: color 0.3s ease;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
     }
-    
-    .status-error {
-      color: #ef4444 !important;
-    }
-    
-    .status-success {
-      color: #a3e635 !important;
-    }
-    
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: #a3e635;
-      animation: spin 1s ease-in-out infinite;
-      margin-right: 10px;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    .footer {
-      margin-top: 30px;
-      text-align: center;
-      color: #64748b;
-      font-size: 14px;
-    }
-    
-    .pulse {
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.7; }
-      100% { opacity: 1; }
-    }
-    
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-      margin-top: 10px;
-      overflow: hidden;
-      display: none;
-    }
-    
-    .progress {
-      height: 100%;
-      background: linear-gradient(90deg, #3b82f6, #a855f7);
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-    
-    .ad-loading {
-      display: none;
-      text-align: center;
-      margin: 10px 0;
+    button:hover {
+      background: #2563eb;
     }
   </style>
-  
-  <!-- Telegram Web App SDK -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  
-  <!-- RichAds SDK -->
-  <script src="https://richinfo.co/richpartners/telegram/js/tg-ob.js"></script>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="logo">⚡</div>
-      <h1>Fast Ads</h1>
-      <p class="subtitle">Watch ads quickly and earn rewards instantly</p>
-    </div>
-    
-    <div class="stats">
-      <div class="stat-item">
-        <div class="stat-value" id="adsWatched">0</div>
-        <div class="stat-label">Ads Watched</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value" id="totalEarnings">$0.00</div>
-        <div class="stat-label">Total Earnings</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value" id="sessionCount">0</div>
-        <div class="stat-label">Today</div>
-      </div>
-    </div>
-    
-    <div class="quick-actions">
-      <button class="quick-btn" id="watch5Btn">Watch 5 Ads</button>
-      <button class="quick-btn" id="watch10Btn">Watch 10 Ads</button>
-    </div>
-    
-    <div class="ad-section">
-      <button id="richadsBtn" class="ad-button" disabled>
-        <div class="ad-icon">💰</div>
-        <div class="ad-info">
-          <div class="ad-title">Watch RichAds</div>
-          <div class="ad-description">Earn <span class="ad-reward">$0.05 - $0.15</span> instantly</div>
-        </div>
-      </button>
-      
-      <div class="ad-loading" id="adLoading">
-        <span class="loading"></span> Loading ad...
-        <div class="progress-bar">
-          <div class="progress" id="progressBar"></div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="status-container">
-      <div id="status">
-        <span class="loading"></span>Initializing RichAds...
-      </div>
-    </div>
-    
-    <div class="footer">
-      <p>Click the button to watch an ad and earn rewards instantly</p>
-    </div>
-  </div>
+  <h1>Telegram Mini App - Play Ads</h1>
+
+  <button id="playAdBtn">Play Ad</button>
 
   <script>
-    // App state
-    const appState = {
-      adsWatched: 0,
-      totalEarnings: 0,
-      sessionCount: 0,
-      richAdsReady: false,
-      isAdPlaying: false
-    };
+    // Initialize the ad engine with your Ad Spot ID
+    window.initCdTma?.({ id: '372809' })
+      .then(show => {
+        window.showAd = show; // store show function globally
 
-    // DOM elements
-    const richadsBtn = document.getElementById('richadsBtn');
-    const statusElement = document.getElementById('status');
-    const adLoadingElement = document.getElementById('adLoading');
-    const progressBarElement = document.getElementById('progressBar');
-    const progressBarContainer = document.querySelector('.progress-bar');
-    const watch5Btn = document.getElementById('watch5Btn');
-    const watch10Btn = document.getElementById('watch10Btn');
-
-    // Initialize the app when the window loads
-    window.addEventListener("load", () => {
-      updateStatus("⏳ Initializing RichAds...");
-      
-      // Preload RichAds for faster performance
-      setTimeout(() => {
-        initializeRichAds();
-      }, 500);
-    });
-
-    // Initialize RichAds
-    function initializeRichAds() {
-      try {
-        window.TelegramAdsController = new TelegramAdsController();
-        window.TelegramAdsController.initialize({
-          pubId: "988052",
-          appId: "3772"
-        });
-        
-        appState.richAdsReady = true;
-        richadsBtn.disabled = false;
-        updateStatus("✅ RichAds ready! Click to watch ads.");
-        console.log("✅ RichAds initialized successfully");
-        
-        // Preload first ad for faster display
-        preloadAd();
-      } catch (e) {
-        console.error("❌ RichAds initialization error:", e);
-        updateStatus("❌ RichAds initialization failed. Please refresh.", true);
-      }
-    }
-
-    // Preload ad for faster display
-    function preloadAd() {
-      // This is a simulated preload - in a real scenario, you might
-      // pre-fetch ad data or initialize the ad player in advance
-      console.log("🔄 Preloading ad for faster display...");
-    }
-
-    // RichAds button handler
-    richadsBtn.onclick = () => {
-      if (!appState.richAdsReady || appState.isAdPlaying) {
-        return;
-      }
-      
-      playAd();
-    };
-
-    // Watch multiple ads buttons
-    watch5Btn.onclick = () => {
-      if (!appState.richAdsReady || appState.isAdPlaying) return;
-      updateStatus("🔄 Preparing to play 5 ads...");
-      // In a real implementation, you would queue multiple ads
-      setTimeout(() => playAd(), 500);
-    };
-
-    watch10Btn.onclick = () => {
-      if (!appState.richAdsReady || appState.isAdPlaying) return;
-      updateStatus("🔄 Preparing to play 10 ads...");
-      // In a real implementation, you would queue multiple ads
-      setTimeout(() => playAd(), 500);
-    };
-
-    // Play ad function
-    function playAd() {
-      appState.isAdPlaying = true;
-      richadsBtn.disabled = true;
-      
-      // Show loading state
-      adLoadingElement.style.display = 'block';
-      progressBarContainer.style.display = 'block';
-      updateStatus("🔄 Loading ad...");
-      
-      // Simulate progress bar
-      let progress = 0;
-      const progressInterval = setInterval(() => {
-        progress += 5;
-        progressBarElement.style.width = `${progress}%`;
-        
-        if (progress >= 90) {
-          clearInterval(progressInterval);
-        }
-      }, 100);
-      
-      console.log("▶️ Attempting to play RichAds");
-      
-      // Play the ad
-      window.TelegramAdsController.show()
-        .then(() => {
-          clearInterval(progressInterval);
-          progressBarElement.style.width = '100%';
-          
-          console.log("✅ RichAds watched successfully");
-          updateStats();
-          
-          // Reset UI
-          setTimeout(() => {
-            adLoadingElement.style.display = 'none';
-            progressBarContainer.style.display = 'none';
-            progressBarElement.style.width = '0%';
-            richadsBtn.disabled = false;
-            appState.isAdPlaying = false;
-            
-            updateStatus("✅ Ad watched successfully! Earnings updated.", false, true);
-            
-            // Preload next ad for faster experience
-            setTimeout(preloadAd, 500);
-          }, 1000);
-        })
-        .catch(err => {
-          clearInterval(progressInterval);
-          console.error("❌ RichAds error:", err);
-          
-          // Reset UI
-          adLoadingElement.style.display = 'none';
-          progressBarContainer.style.display = 'none';
-          progressBarElement.style.width = '0%';
-          richadsBtn.disabled = false;
-          appState.isAdPlaying = false;
-          
-          updateStatus("❌ Failed to play ad: " + (err.message || "Unknown error"), true);
-        });
-    }
-
-    // Update status message
-    function updateStatus(message, isError = false, isSuccess = false) {
-      statusElement.innerHTML = message;
-      
-      statusElement.classList.remove("status-error", "status-success");
-      if (isError) {
-        statusElement.classList.add("status-error");
-      } else if (isSuccess) {
-        statusElement.classList.add("status-success");
-      }
-    }
-
-    // Update stats (ads watched and earnings)
-    function updateStats() {
-      appState.adsWatched++;
-      appState.sessionCount++;
-      
-      // Simulate earnings between $0.05 and $0.15
-      const earnings = (Math.random() * 0.10 + 0.05).toFixed(2);
-      appState.totalEarnings = (parseFloat(appState.totalEarnings) + parseFloat(earnings)).toFixed(2);
-      
-      document.getElementById("adsWatched").textContent = appState.adsWatched;
-      document.getElementById("totalEarnings").textContent = `$${appState.totalEarnings}`;
-      document.getElementById("sessionCount").textContent = appState.sessionCount;
-      
-      // Add visual feedback
-      const statsElement = document.querySelector('.stats');
-      statsElement.classList.add('pulse');
-      setTimeout(() => {
-        statsElement.classList.remove('pulse');
-      }, 1000);
-    }
+        document.getElementById("playAdBtn").onclick = () => {
+          window.showAd?.()
+            .then(() => console.log('✅ Ad played successfully'))
+            .catch(e => console.error('❌ Error playing ad:', e));
+        };
+      })
+      .catch(e => console.error('❌ Init failed:', e));
   </script>
 </body>
 </html>
