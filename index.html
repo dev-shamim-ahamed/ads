@@ -6,7 +6,7 @@
     <title>Earnings Dashboard</title>
     
     <!-- AdExtra Script Integration -->
-    <script async src="https://partner.adextra.io/jt/7fb445b51d4d8631807e784a33af27952e1d30e6.js"></script>
+    <script async src="https://partner.adextra.io/js/7Fb445b51d4d8631807e784a33af27952e1d30e6.js"></script>
     
     <style>
         * {
@@ -157,6 +157,25 @@
             border-bottom: 8px solid transparent;
         }
 
+        /* Ad Container Styles */
+        .ad-container {
+            background: rgba(30, 60, 114, 0.8);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .ad-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
         .loading-spinner {
             border: 3px solid rgba(255, 255, 255, 0.3);
             border-top: 3px solid #00d4ff;
@@ -177,7 +196,6 @@
             font-size: 14px;
             margin-top: 10px;
             min-height: 20px;
-            text-align: center;
         }
 
         .error-message {
@@ -206,6 +224,32 @@
 </head>
 <body>
     <div class="dashboard-container">
+        <!-- Banner Ad Section -->
+        <div class="ad-container">
+            <div class="ad-label">Advertisement</div>
+            <!-- AdExtra Banner Ad Placement -->
+            <div id="7Fb445b51d4d8631807e784a33af27952e1d30e6"></div>
+        </div>
+
+        <!-- Main Balance Card -->
+        <div class="main-balance-card">
+            <div class="balance-label">total balance</div>
+            <div class="balance-amount" id="totalBalance">৳0.00</div>
+            <div class="per-ad-info">Per Ad: ৳ <span id="perAdAmount">0.010</span></div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Ads</div>
+                <div class="stat-value" id="totalAds">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Income</div>
+                <div class="stat-value" id="totalIncome">৳0.00</div>
+            </div>
+        </div>
+
         <!-- Start Earn Button -->
         <button class="start-earn-button" id="startEarnBtn">
             <div class="play-icon"></div>
@@ -218,19 +262,37 @@
 
     <script>
         // AdExtra Integration Variables
-        const APP_ID = 'YOUR_APP_ID_HERE'; // Replace with your actual App ID
-        const PLACEMENT_ID = '7Fb445b51d4d8631807e784a33af27952e1d30e6';
         let adLoaded = false;
         let adCompleted = false;
 
         // Dashboard data
         let dashboardData = {
-            totalAds: 0
+            totalBalance: 0.00,
+            perAd: 0.010,
+            totalAds: 0,
+            totalIncome: 0.00
         };
 
         // DOM elements
+        const totalBalanceEl = document.getElementById('totalBalance');
+        const perAdAmountEl = document.getElementById('perAdAmount');
+        const totalAdsEl = document.getElementById('totalAds');
+        const totalIncomeEl = document.getElementById('totalIncome');
         const startEarnBtn = document.getElementById('startEarnBtn');
         const statusMessage = document.getElementById('statusMessage');
+
+        // Format currency
+        function formatCurrency(amount) {
+            return `৳${amount.toFixed(2)}`;
+        }
+
+        // Update display
+        function updateDisplay() {
+            totalBalanceEl.textContent = formatCurrency(dashboardData.totalBalance);
+            perAdAmountEl.textContent = dashboardData.perAd.toFixed(3);
+            totalAdsEl.textContent = dashboardData.totalAds;
+            totalIncomeEl.textContent = formatCurrency(dashboardData.totalIncome);
+        }
 
         // Show status message
         function showStatus(message, type = 'normal') {
@@ -245,7 +307,21 @@
         // Credit earnings after successful ad completion
         function creditEarnings() {
             dashboardData.totalAds += 1;
-            showStatus('Ad completed successfully!', 'success');
+            dashboardData.totalBalance += dashboardData.perAd;
+            dashboardData.totalIncome += dashboardData.perAd;
+            
+            updateDisplay();
+            showStatus('৳0.010 earned successfully!', 'success');
+            
+            // Add earning animation
+            totalBalanceEl.style.transform = 'scale(1.1)';
+            totalBalanceEl.style.color = '#00ff88';
+            
+            setTimeout(() => {
+                totalBalanceEl.style.transform = 'scale(1)';
+                totalBalanceEl.style.color = 'white';
+            }, 500);
+
             resetEarnButton();
         }
 
@@ -315,7 +391,18 @@
         startEarnBtn.addEventListener('click', startEarning);
 
         // Initialize
-        console.log('AdExtra Dashboard Initialized - Start Earn Button Only');
+        updateDisplay();
+
+        // Add interactive effects to stat cards
+        document.querySelectorAll('.stat-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.background = 'rgba(74, 108, 247, 0.3)';
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                card.style.background = 'rgba(30, 60, 114, 0.8)';
+            });
+        });
 
         // Load banner ad if AdExtra is available
         window.addEventListener('load', () => {
@@ -329,7 +416,8 @@
         // Log integration status
         console.log('AdExtra Integration Configuration:');
         console.log('- Placement ID: 7Fb445b51d4d8631807e784a33af27952e1d30e6');
-        console.log('- Script URL: https://partner.adextra.io/jt/7Fb445b51d4d8631807e784a33af27952e1d30e6.js');
+        console.log('- Script URL: https://partner.adextra.io/js/7Fb445b51d4d8631807e784a33af27952e1d30e6.js');
+        console.log('- Banner Container: div with matching ID');
         console.log('- Fullscreen Function: p_adextra(onSuccess, onError)');
         console.log('- Ad display: AdExtra handles fullscreen automatically');
     </script>
