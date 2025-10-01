@@ -1,55 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AdExtra Watch Ads</title>
-    
-    <!-- AdExtra script -->
-    <script async src="https://partner.adextra.io/jt/ebef790ddde25942ba27967eaed3aa4079bc10ce.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Telegram Mini App Ads</title>
+
+  <!-- Load Onclicka TMA SDK -->
+  <script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 50px;
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #1d4ed8;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      font-size: 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+  </style>
 </head>
 <body>
-    <!-- Watch Ads Button -->
-    <button id="watchAdsBtn">Watch Ads</button>
+  <h1>Telegram Mini App - Play Ads</h1>
 
-    <!-- Ad container -->
-    <div id="ebef790ddde25942ba27967eaed3aa4079bc10ce" style="margin-top:20px;"></div>
+  <button id="playAdBtn">Play Ad</button>
 
-    <script>
-        var adContainerId = 'ebef790ddde25942ba27967eaed3aa4079bc10ce';
+  <script>
+    window.initCdTma?.({ id: '6090192' })
+      .then(show => {
+        window.showAd = show;
 
-        // Error callback
-        var onError = () => {
-            console.log("Ad failed to load");
-            fetch('/ad-error-endpoint')  // replace with your endpoint
-                .then(response => console.log("Error logged"))
-                .catch(err => console.error(err));
+        document.getElementById("playAdBtn").onclick = () => {
+          window.showAd?.()
+            .then(() => console.log('✅ Ad played successfully'))
+            .catch(e => console.error('❌ Error playing ad:', e));
         };
-
-        // Success callback
-        var onSuccess = () => {
-            console.log("Ad loaded successfully");
-            fetch('/ad-success-endpoint')  // replace with your endpoint
-                .then(response => console.log("Success logged"))
-                .catch(err => console.error(err));
-        };
-
-        // Function to load the ad
-        function loadAd() {
-            if (typeof p_adextra === "function") {
-                p_adextra(onSuccess, onError);
-            } else {
-                console.error("AdExtra script not loaded yet");
-            }
-        }
-
-        // Watch Ads button click event
-        document.getElementById('watchAdsBtn').addEventListener('click', () => {
-            loadAd();
-            // Optional: disable button after click
-            document.getElementById('watchAdsBtn').disabled = true;
-            document.getElementById('watchAdsBtn').innerText = "Ad Loading...";
-        });
-    </script>
+      })
+      .catch(e => console.error('❌ Init failed:', e));
+  </script>
 </body>
 </html>
