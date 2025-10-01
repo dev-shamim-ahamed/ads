@@ -33,26 +33,59 @@
     button:hover {
       background: #2563eb;
     }
+    #log {
+      margin-top: 30px;
+      text-align: left;
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 10px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: 14px;
+      height: 200px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
   <h1>Telegram Mini App - Play Ads</h1>
 
-  <button id="playAdBtn">Play Ad</button>
+  <button id="playAdBtn" disabled>Loading Ad...</button>
+
+  <div id="log"></div>
 
   <script>
-    // Initialize the ad engine with your Ad Spot ID
+    const logEl = document.getElementById('log');
+
+    function log(msg) {
+      console.log(msg);
+      logEl.innerHTML += msg + "<br/>";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    log("🚀 Initializing TMA SDK...");
+
+    // Initialize the TMA SDK with your Ad Spot ID
     window.initCdTma?.({ id: '372809' })
       .then(show => {
-        window.showAd = show; // store show function globally
+        log("✅ TMA SDK ready");
+        window.showAd = show;
 
-        document.getElementById("playAdBtn").onclick = () => {
+        const btn = document.getElementById("playAdBtn");
+        btn.disabled = false;
+        btn.textContent = "Play Ad";
+
+        btn.onclick = () => {
+          log("▶️ Attempting to play ad...");
           window.showAd?.()
-            .then(() => console.log('✅ Ad played successfully'))
-            .catch(e => console.error('❌ Error playing ad:', e));
+            .then(() => log("✅ Ad played successfully"))
+            .catch(e => log("❌ Failed to play ad: " + e));
         };
       })
-      .catch(e => console.error('❌ Init failed:', e));
+      .catch(e => {
+        log("❌ SDK init failed: " + e);
+      });
   </script>
 </body>
 </html>
