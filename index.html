@@ -25,6 +25,7 @@
       transition: 0.3s;
     }
     button:hover { background: #1d4ed8; }
+    button:disabled { background: #475569; cursor: not-allowed; }
     #status { margin-top: 20px; font-size: 16px; color: #a3e635; }
   </style>
 
@@ -41,7 +42,7 @@
   <button id="richadsBtn" disabled>Watch RichAds</button>
   <button id="onclickaBtn" disabled>Watch Onclicka</button>
 
-  <div id="status">⏳ Initializing SDKs...</div>
+  <div id="status">⏳ Initializing...</div>
 
   <script>
     let onclickaShow = null;
@@ -52,30 +53,33 @@
       try {
         window.TelegramAdsController = new TelegramAdsController();
         window.TelegramAdsController.initialize({
-          pubId: "988052", // আপনার pubId
-          appId: "3772"    // আপনার appId
+          pubId: "988052",   // আপনার RichAds pubId
+          appId: "3772"      // আপনার RichAds appId
         });
         richAdsReady = true;
         document.getElementById("richadsBtn").disabled = false;
+        console.log("✅ RichAds initialized");
       } catch (e) {
-        console.log("RichAds init error:", e);
+        console.error("RichAds init error:", e);
       }
 
       // ✅ Init Onclicka
       if (window.initCdTma) {
-        window.initCdTma({ id: 372029 }) // Spot ID
+        window.initCdTma({ id: 372029 }) // আপনার Onclicka Spot ID
           .then(show => {
             onclickaShow = show;
             document.getElementById("onclickaBtn").disabled = false;
+            console.log("✅ Onclicka initialized");
           })
-          .catch(err => console.log("Onclicka init error:", err));
+          .catch(err => console.error("Onclicka init error:", err));
       }
 
-      document.getElementById("status").innerText = "✅ SDKs Initialized!";
+      document.getElementById("status").innerText = "✅ SDKs Initialized, click a button!";
     });
 
     // 🚀 Play RichAds
     document.getElementById("richadsBtn").onclick = () => {
+      console.log("▶️ Trying RichAds show()");
       if (!richAdsReady) {
         return document.getElementById("status").innerText = "❌ RichAds not ready!";
       }
@@ -85,11 +89,13 @@
         })
         .catch(err => {
           document.getElementById("status").innerText = "❌ RichAds Error: " + err;
+          console.error("RichAds error:", err);
         });
     };
 
     // 🚀 Play Onclicka
     document.getElementById("onclickaBtn").onclick = () => {
+      console.log("▶️ Trying Onclicka show()");
       if (!onclickaShow) {
         return document.getElementById("status").innerText = "❌ Onclicka not ready!";
       }
@@ -99,6 +105,7 @@
         })
         .catch(err => {
           document.getElementById("status").innerText = "❌ Onclicka Error: " + err;
+          console.error("Onclicka error:", err);
         });
     };
   </script>
