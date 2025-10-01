@@ -12,9 +12,7 @@
       text-align: center;
       padding: 40px;
     }
-    h1 {
-      margin-bottom: 20px;
-    }
+    h1 { margin-bottom: 20px; }
     button {
       padding: 15px 25px;
       font-size: 18px;
@@ -26,80 +24,83 @@
       margin: 15px;
       transition: 0.3s;
     }
-    button:hover {
-      background: #1d4ed8;
-    }
-    #status {
-      margin-top: 20px;
-      font-size: 16px;
-      color: #a3e635;
-    }
+    button:hover { background: #1d4ed8; }
+    #status { margin-top: 20px; font-size: 16px; color: #a3e635; }
   </style>
 
-  <!-- RichAds / TADS -->
+  <!-- RichAds SDK -->
   <script src="https://richinfo.co/richpartners/telegram/js/tg-ob.js"></script>
-  <script>
-    window.TelegramAdsController = new TelegramAdsController();
-    window.TelegramAdsController.initialize({
-      pubId: "988052",   // আপনার pubId
-      appId: "3772"      // আপনার appId
-    });
-  </script>
 
-  <!-- Onclicka / In-Stream -->
+  <!-- Onclicka SDK -->
   <script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
 </head>
 <body>
   <h1>🎬 Watch & Earn</h1>
   <p>Click a button to watch an ad:</p>
 
-  <!-- RichAds Button -->
-  <button onclick="playRichAds()">Watch RichAds</button>
+  <button id="richadsBtn" disabled>Watch RichAds</button>
+  <button id="onclickaBtn" disabled>Watch Onclicka</button>
 
-  <!-- Onclicka Button -->
-  <button onclick="playOnclicka()">Watch Onclicka</button>
-
-  <div id="status"></div>
+  <div id="status">⏳ Initializing SDKs...</div>
 
   <script>
-    // RichAds Ad
-    function playRichAds() {
-      document.getElementById("status").innerText = "Loading RichAds...";
-      try {
-        window.TelegramAdsController.show()
-          .then(() => {
-            document.getElementById("status").innerText = "✅ RichAds Watched Successfully!";
-          })
-          .catch(err => {
-            document.getElementById("status").innerText = "❌ Error showing RichAds: " + err;
-          });
-      } catch (e) {
-        document.getElementById("status").innerText = "❌ Controller not ready!";
-      }
-    }
-
-    // Onclicka Ad
     let onclickaShow = null;
-    window.initCdTma?.({ id: 372029 }) // আপনার Spot ID
-      .then(show => {
-        onclickaShow = show;
-      })
-      .catch(e => console.log("Init error:", e));
+    let richAdsReady = false;
 
-    function playOnclicka() {
-      document.getElementById("status").innerText = "Loading Onclicka...";
-      if (onclickaShow) {
-        onclickaShow()
-          .then(() => {
-            document.getElementById("status").innerText = "✅ Onclicka Watched Successfully!";
-          })
-          .catch(err => {
-            document.getElementById("status").innerText = "❌ Error showing Onclicka: " + err;
-          });
-      } else {
-        document.getElementById("status").innerText = "❌ Onclicka SDK not ready!";
+    window.addEventListener("load", () => {
+      // ✅ Init RichAds
+      try {
+        window.TelegramAdsController = new TelegramAdsController();
+        window.TelegramAdsController.initialize({
+          pubId: "988052", // আপনার pubId
+          appId: "3772"    // আপনার appId
+        });
+        richAdsReady = true;
+        document.getElementById("richadsBtn").disabled = false;
+      } catch (e) {
+        console.log("RichAds init error:", e);
       }
-    }
+
+      // ✅ Init Onclicka
+      if (window.initCdTma) {
+        window.initCdTma({ id: 372029 }) // Spot ID
+          .then(show => {
+            onclickaShow = show;
+            document.getElementById("onclickaBtn").disabled = false;
+          })
+          .catch(err => console.log("Onclicka init error:", err));
+      }
+
+      document.getElementById("status").innerText = "✅ SDKs Initialized!";
+    });
+
+    // 🚀 Play RichAds
+    document.getElementById("richadsBtn").onclick = () => {
+      if (!richAdsReady) {
+        return document.getElementById("status").innerText = "❌ RichAds not ready!";
+      }
+      window.TelegramAdsController.show()
+        .then(() => {
+          document.getElementById("status").innerText = "✅ RichAds Watched Successfully!";
+        })
+        .catch(err => {
+          document.getElementById("status").innerText = "❌ RichAds Error: " + err;
+        });
+    };
+
+    // 🚀 Play Onclicka
+    document.getElementById("onclickaBtn").onclick = () => {
+      if (!onclickaShow) {
+        return document.getElementById("status").innerText = "❌ Onclicka not ready!";
+      }
+      onclickaShow()
+        .then(() => {
+          document.getElementById("status").innerText = "✅ Onclicka Watched Successfully!";
+        })
+        .catch(err => {
+          document.getElementById("status").innerText = "❌ Onclicka Error: " + err;
+        });
+    };
   </script>
 </body>
 </html>
