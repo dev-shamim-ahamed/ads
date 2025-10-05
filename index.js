@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import telegramRoutes from "./routes/telegram.js";
+import telegramRoutes from "./telegram.js";
 
 dotenv.config();
 
@@ -22,3 +22,4 @@ app.get("/health", (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
