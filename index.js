@@ -108,10 +108,10 @@ bot.launch();
 // ===== Express Server Initialization =====
 const app = express();
 const PORT = process.env.PORT || 3001;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = 'https://178ql44r-5173.asse.devtunnels.ms/';
 
 app.use(cors({
-  origin: [FRONTEND_URL, 'http://localhost:5173'],
+  origin: ['https://178ql44r-5173.asse.devtunnels.ms/'],
   credentials: true
 }));
 
@@ -246,3 +246,4 @@ process.on('uncaughtException', (error) => process.exit(1));
 process.on('unhandledRejection', (reason) => process.exit(1));
 
 module.exports = app;
+
