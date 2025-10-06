@@ -11,7 +11,7 @@ const FRONTEND_URL = 'https://primev1.vercel.app/';
 
 // Middleware
 app.use(cors({
-    origin: [FRONTEND_URL, 'http://localhost:5173'],
+    origin: [FRONTEND_URL],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -471,6 +471,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 module.exports = app;
+
 
 
 
