@@ -175,7 +175,7 @@ app.post('/api/telegram/check-membership', async (req, res) => {
         }
 
         // Get Telegram Bot Token from environment
-        const botToken = 7997214783:AAG8mwdPox1urOKx4GAO3Lk9xUOzrAMJiV0;
+        const botToken = "7997214783:AAG8mwdPox1urOKx4GAO3Lk9xUOzrAMJiV0";
         if (!botToken) {
             console.error('❌ Telegram Bot Token not configured');
             return res.status(500).json({
@@ -471,4 +471,5 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 module.exports = app;
+
 
