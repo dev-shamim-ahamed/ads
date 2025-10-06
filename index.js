@@ -10,7 +10,7 @@ const serviceAccount = require('./serviceAccountKey.json');
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    databaseURL: process.env.FIREBASE_DB_URL || "https://test-6977e-default-rtdb.firebaseio.com/"
+    databaseURL: "https://test-6977e-default-rtdb.firebaseio.com/"
   });
 }
 const db = admin.database();
@@ -203,3 +203,4 @@ process.on('uncaughtException', () => process.exit(1));
 process.on('unhandledRejection', () => process.exit(1));
 
 module.exports = app;
+
