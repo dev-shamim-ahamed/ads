@@ -2,7 +2,7 @@
   "name": "daily-tasks-server",
   "version": "1.0.0",
   "description": "Backend server for Daily Tasks with Telegram integration",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
@@ -21,4 +21,5 @@
     "nodemon": "^3.0.1"
   }
 }
+
 
