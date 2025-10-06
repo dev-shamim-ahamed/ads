@@ -1,29 +1,14 @@
 const { Telegraf } = require('telegraf');
-const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-require('dotenv').config();
 
-// Firebase Admin initialization
-const serviceAccount = require('./serviceAccountKey.json');
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://test-6977e-default-rtdb.firebaseio.com/"
-});
-
-const db = admin.database();
-
-// Initialize Telegram bot with your token
-const bot = new Telegraf('7997214783:AAG8mwdPox1urOKx4GAO3Lk9xUOzrAMJiV0');
-
-// Express server setup
+// Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Your frontend URL - adjust this to your actual frontend URL
-const FRONTEND_URL = 'https://primev1.vercel.app'; // CHANGE THIS TO YOUR ACTUAL FRONTEND URL
+// Your frontend URL
+const FRONTEND_URL = 'https://primev1.vercel.app';
 
 // Middleware
 app.use(cors({
@@ -39,37 +24,60 @@ app.use(express.json({ limit: '10mb' }));
 const frontendConnections = [];
 const MAX_CONNECTIONS = 1000;
 
-// Enhanced logging middleware
-app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`, {
-        ip: req.ip || req.connection.remoteAddress,
-        userAgent: req.get('User-Agent')?.substring(0, 100),
-        origin: req.get('Origin')
-    });
-    next();
-});
+// --- Firebase Configuration ---
+const FIREBASE_DB_URL = 'https://test-6977e-default-rtdb.firebaseio.com';
 
-// Telegram Bot Commands
+// --- Helper Functions ---
+async function getData(path) {
+  try {
+    const res = await axios.get(`${FIREBASE_DB_URL}/${path}.json`);
+    return res.data;
+  } catch (err) {
+    console.error('Firebase GET error:', err.message);
+    return null;
+  }
+}
 
+async function setData(path, data) {
+  try {
+    await axios.put(`${FIREBASE_DB_URL}/${path}.json`, data);
+  } catch (err) {
+    console.error('Firebase SET error:', err.message);
+  }
+}
+
+async function updateData(path, data) {
+  try {
+    await axios.patch(`${FIREBASE_DB_URL}/${path}.json`, data);
+  } catch (err) {
+    console.error('Firebase UPDATE error:', err.message);
+  }
+}
+
+// --- Telegram Bot Setup ---
+const BOT_TOKEN = '7997214783:AAG8mwdPox1urOKx4GAO3Lk9xUOzrAMJiV0';
+const bot = new Telegraf(BOT_TOKEN);
+
+// --- Telegram Bot Commands ---
+
+// Start Command
 bot.start(async (ctx) => {
   try {
     const messageText = ctx.message.text;
-    const args = messageText.split(' '); 
-    const referrerId = args[1];
+    const args = messageText.split(' ');
+    const referrerId = args[1] || null;
     const currentUserId = String(ctx.from.id);
 
     console.log(`Start command received from ${currentUserId}, referrer: ${referrerId}`);
 
-    const userRef = db.ref(`users/${currentUserId}`);
-    const snapshot = await userRef.once('value');
-
+    // Check if user exists
+    let userData = await getData(`users/${currentUserId}`);
     let isNewUser = false;
 
-    if (!snapshot.exists()) {
-      // Create new user
+    if (!userData) {
       isNewUser = true;
-      await userRef.set({
+      // Create new user
+      await setData(`users/${currentUserId}`, {
         telegramId: parseInt(currentUserId),
         username: ctx.from.username || "",
         firstName: ctx.from.first_name || "User",
@@ -91,25 +99,17 @@ bot.start(async (ctx) => {
     if (referrerId && referrerId !== currentUserId && isNewUser) {
       console.log(`Processing referral for new user ${currentUserId} referred by ${referrerId}`);
 
-      const referralRef = db.ref(`referrals/${referrerId}/referredUsers/${currentUserId}`);
-      await referralRef.set({
+      await setData(`referrals/${referrerId}/referredUsers/${currentUserId}`, {
         joinedAt: new Date().toISOString(),
         bonusGiven: false
       });
 
-      const referrerStatsRef = db.ref(`referrals/${referrerId}`);
-      const referrerStatsSnap = await referrerStatsRef.once('value');
+      // Update referrer stats
+      let referrerStats = await getData(`referrals/${referrerId}`) || {};
+      let referredCount = referrerStats.referredCount || 0;
+      let referralEarnings = referrerStats.referralEarnings || 0;
 
-      let referredCount = 0;
-      let referralEarnings = 0;
-
-      if (referrerStatsSnap.exists()) {
-        const data = referrerStatsSnap.val();
-        referredCount = data.referredCount || 0;
-        referralEarnings = data.referralEarnings || 0;
-      }
-
-      await referrerStatsRef.update({
+      await updateData(`referrals/${referrerId}`, {
         referralCode: referrerId,
         referredCount: referredCount + 1,
         referralEarnings: referralEarnings
@@ -119,28 +119,16 @@ bot.start(async (ctx) => {
 
       // Notify referrer
       try {
-        await ctx.telegram.sendMessage(referrerId, 
-          `New referral! ${ctx.from.first_name}.`,
-          { parse_mode: 'HTML' }
-        );
+        await ctx.telegram.sendMessage(referrerId, `🎉 New referral! ${ctx.from.first_name}.`, { parse_mode: 'HTML' });
       } catch (error) {
         console.log('Could not notify referrer:', error.message);
       }
     }
 
-    // Fetch user data
-    const userSnap = await userRef.once('value');
-    const userData = userSnap.val();
-
-    const referralSnap = await db.ref(`referrals/${currentUserId}`).once('value');
-    let referredCount = 0;
-    let referralEarnings = 0;
-
-    if (referralSnap.exists()) {
-      const refData = referralSnap.val();
-      referredCount = refData.referredCount || 0;
-      referralEarnings = refData.referralEarnings || 0;
-    }
+    // Fetch user referral stats
+    const referralSnap = await getData(`referrals/${currentUserId}`) || {};
+    let referredCount = referralSnap.referredCount || 0;
+    let referralEarnings = referralSnap.referralEarnings || 0;
 
     let welcomeMessage = `👋 <b>Hi ${ctx.from.first_name}!</b>\n`;
 
@@ -160,22 +148,39 @@ bot.start(async (ctx) => {
 
 // Add referral earnings manually (Admin only)
 bot.command('addreferral', async (ctx) => {
-  const args = ctx.message.text.split(' '); // /addreferral <userId> <amount>
-  if (args.length < 3) return ctx.reply('Usage: /addreferral <userId> <amount>');
+  try {
+    const args = ctx.message.text.split(' '); // /addreferral <userId> <amount>
+    if (args.length < 3) return ctx.reply('Usage: /addreferral <userId> <amount>');
 
-  const userId = args[1];
-  const amount = parseFloat(args[2]);
-  if (isNaN(amount)) return ctx.reply('Invalid amount');
+    const userId = args[1];
+    const amount = parseFloat(args[2]);
+    if (isNaN(amount)) return ctx.reply('Invalid amount');
 
-  const referralRef = db.ref(`referrals/${userId}`);
-  const referralSnap = await referralRef.once('value');
-  let referralEarnings = 0;
-  if (referralSnap.exists()) referralEarnings = referralSnap.val().referralEarnings || 0;
+    const referralSnap = await getData(`referrals/${userId}`) || {};
+    const referralEarnings = referralSnap.referralEarnings || 0;
+
+    await updateData(`referrals/${userId}`, {
+      referralEarnings: referralEarnings + amount
+    });
+
+    await ctx.reply(`✅ Added ${amount} to referral earnings of user ${userId}`);
+  } catch (err) {
+    console.error('Error in addreferral command:', err);
+    await ctx.reply('❌ Failed to add referral earnings.');
+  }
 });
 
-// Error handling
-bot.catch((err, ctx) => {
-  console.error(`Error for ${ctx.updateType}:`, err);
+// --- Express Server Routes ---
+
+// Enhanced logging middleware
+app.use((req, res, next) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`, {
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent')?.substring(0, 100),
+        origin: req.get('Origin')
+    });
+    next();
 });
 
 // Helper function to clean old connections
@@ -203,12 +208,10 @@ function updateConnectionLastSeen(connectionId) {
     }
 }
 
-// Express Routes
-
 // Root endpoint
 app.get('/', (req, res) => {
     res.json({
-        message: 'Tasks Backend Server is running!',
+        message: 'Telegram Bot & Tasks Backend Server is running!',
         timestamp: new Date().toISOString(),
         version: '1.0.0',
         frontendUrl: FRONTEND_URL,
@@ -291,70 +294,6 @@ app.post('/api/frontend/connect', (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Internal server error'
-        });
-    }
-});
-
-// Telegram membership check endpoint
-app.post('/api/telegram/check-membership', async (req, res) => {
-    try {
-        const { userId, username, channel, connectionId, taskId, taskName } = req.body;
-
-        console.log('🔍 Checking Telegram membership request:', {
-            userId,
-            username: username || 'unknown',
-            channel,
-            connectionId: connectionId || 'unknown',
-            origin: req.get('Origin')
-        });
-
-        if (!userId || !channel) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: userId and channel are required'
-            });
-        }
-
-        // Update connection last seen
-        if (connectionId) {
-            updateConnectionLastSeen(connectionId);
-        }
-
-        // Use the same bot token
-        const botToken = "7997214783:AAG8mwdPox1urOKx4GAO3Lk9xUOzrAMJiV0";
-        if (!botToken) {
-            console.error('❌ Telegram Bot Token not configured');
-            return res.status(500).json({
-                success: false,
-                error: 'Telegram bot token not configured on server',
-                isMember: false
-            });
-        }
-
-        // Check membership using Telegram Bot API
-        const isMember = await checkTelegramChannelMembership(botToken, userId, channel);
-        
-        console.log('📊 Membership check result:', {
-            userId,
-            channel,
-            isMember,
-            origin: req.get('Origin')
-        });
-
-        res.json({
-            success: true,
-            isMember: isMember,
-            checkedAt: new Date().toISOString(),
-            userId: userId,
-            channel: channel
-        });
-
-    } catch (error) {
-        console.error('❌ Telegram membership check failed:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message || 'Failed to check Telegram membership',
-            isMember: false
         });
     }
 });
@@ -444,6 +383,59 @@ async function checkTelegramChannelMembership(botToken, userId, channel) {
     }
 }
 
+// Telegram membership check endpoint
+app.post('/api/telegram/check-membership', async (req, res) => {
+    try {
+        const { userId, username, channel, connectionId, taskId, taskName } = req.body;
+
+        console.log('🔍 Checking Telegram membership request:', {
+            userId,
+            username: username || 'unknown',
+            channel,
+            connectionId: connectionId || 'unknown',
+            origin: req.get('Origin')
+        });
+
+        if (!userId || !channel) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: userId and channel are required'
+            });
+        }
+
+        // Update connection last seen
+        if (connectionId) {
+            updateConnectionLastSeen(connectionId);
+        }
+
+        // Check membership using Telegram Bot API
+        const isMember = await checkTelegramChannelMembership(BOT_TOKEN, userId, channel);
+        
+        console.log('📊 Membership check result:', {
+            userId,
+            channel,
+            isMember,
+            origin: req.get('Origin')
+        });
+
+        res.json({
+            success: true,
+            isMember: isMember,
+            checkedAt: new Date().toISOString(),
+            userId: userId,
+            channel: channel
+        });
+
+    } catch (error) {
+        console.error('❌ Telegram membership check failed:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to check Telegram membership',
+            isMember: false
+        });
+    }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     try {
@@ -479,7 +471,7 @@ app.get('/api/health', (req, res) => {
                 heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024) + ' MB'
             },
             environment: process.env.NODE_ENV || 'development',
-            telegram_bot_configured: true
+            telegram_bot_configured: !!BOT_TOKEN
         };
 
         res.json(healthInfo);
@@ -567,12 +559,17 @@ app.use('*', (req, res) => {
     });
 });
 
-// Start both bot and server
+// --- Bot Error handling ---
+bot.catch((err, ctx) => {
+    console.error(`Error for ${ctx.updateType}:`, err);
+});
+
+// --- Start Server and Bot ---
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n🚀 Tasks Backend Server started successfully!');
+    console.log('\n🚀 Combined Telegram Bot & Express Server started successfully!');
     console.log(`📍 Server running on: http://localhost:${PORT}`);
     console.log(`🌐 Frontend URL: ${FRONTEND_URL}`);
-    console.log(`🤖 Telegram Bot: ✅ Configured`);
+    console.log(`🤖 Telegram Bot: ${BOT_TOKEN ? '✅ Configured' : '❌ Not configured'}`);
     console.log('\n📋 Available endpoints:');
     console.log('   GET  /              - Server info');
     console.log('   GET  /api/test      - Test connection');
@@ -580,12 +577,19 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('   GET  /api/connections - Connection statistics');
     console.log('   POST /api/frontend/connect - Register frontend');
     console.log('   POST /api/telegram/check-membership - Check Telegram membership');
+    console.log('\n🤖 Telegram Bot Commands:');
+    console.log('   /start - Start the bot');
+    console.log('   /addreferral - Add referral earnings (Admin)');
 });
 
-// Start bot
-bot.launch().then(() => console.log('🤖 Telegram Bot is running...'));
+// Start the Telegram bot
+bot.launch().then(() => {
+    console.log('✅ Telegram Bot is now running!');
+}).catch(err => {
+    console.error('❌ Failed to start Telegram Bot:', err);
+});
 
-// Graceful shutdown
+// --- Graceful shutdown ---
 process.once('SIGINT', () => {
     console.log('🛑 Received SIGINT, shutting down gracefully...');
     bot.stop('SIGINT');
@@ -616,4 +620,3 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 module.exports = app;
-
