@@ -1,13 +1,29 @@
+const { Telegraf } = require('telegraf');
+const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
 
+// Firebase Admin initialization
+const serviceAccount = require('./serviceAccountKey.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://test-6977e-default-rtdb.firebaseio.com/"
+});
+
+const db = admin.database();
+
+// Initialize Telegram bot with your token
+const bot = new Telegraf('7997214783:AAG8mwdPox1urOKx4GAO3Lk9xUOzrAMJiV0');
+
+// Express server setup
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Your frontend URL
-const FRONTEND_URL = 'https://primev1.vercel.app';
+// Your frontend URL - adjust this to your actual frontend URL
+const FRONTEND_URL = 'https://primev1.vercel.app'; // CHANGE THIS TO YOUR ACTUAL FRONTEND URL
 
 // Middleware
 app.use(cors({
@@ -34,6 +50,134 @@ app.use((req, res, next) => {
     next();
 });
 
+// Telegram Bot Commands
+
+bot.start(async (ctx) => {
+  try {
+    const messageText = ctx.message.text;
+    const args = messageText.split(' '); 
+    const referrerId = args[1];
+    const currentUserId = String(ctx.from.id);
+
+    console.log(`Start command received from ${currentUserId}, referrer: ${referrerId}`);
+
+    const userRef = db.ref(`users/${currentUserId}`);
+    const snapshot = await userRef.once('value');
+
+    let isNewUser = false;
+
+    if (!snapshot.exists()) {
+      // Create new user
+      isNewUser = true;
+      await userRef.set({
+        telegramId: parseInt(currentUserId),
+        username: ctx.from.username || "",
+        firstName: ctx.from.first_name || "User",
+        lastName: ctx.from.last_name || "",
+        balance: 0,
+        totalEarned: 0,
+        totalWithdrawn: 0,
+        joinDate: new Date().toISOString(),
+        adsWatchedToday: 0,
+        tasksCompleted: {},
+        referredBy: referrerId || null
+      });
+      console.log(`New user created: ${currentUserId}`);
+    } else {
+      console.log(`Existing user: ${currentUserId}`);
+    }
+
+    // Handle referral system
+    if (referrerId && referrerId !== currentUserId && isNewUser) {
+      console.log(`Processing referral for new user ${currentUserId} referred by ${referrerId}`);
+
+      const referralRef = db.ref(`referrals/${referrerId}/referredUsers/${currentUserId}`);
+      await referralRef.set({
+        joinedAt: new Date().toISOString(),
+        bonusGiven: false
+      });
+
+      const referrerStatsRef = db.ref(`referrals/${referrerId}`);
+      const referrerStatsSnap = await referrerStatsRef.once('value');
+
+      let referredCount = 0;
+      let referralEarnings = 0;
+
+      if (referrerStatsSnap.exists()) {
+        const data = referrerStatsSnap.val();
+        referredCount = data.referredCount || 0;
+        referralEarnings = data.referralEarnings || 0;
+      }
+
+      await referrerStatsRef.update({
+        referralCode: referrerId,
+        referredCount: referredCount + 1,
+        referralEarnings: referralEarnings
+      });
+
+      console.log(`Referral recorded: ${currentUserId} referred by ${referrerId}`);
+
+      // Notify referrer
+      try {
+        await ctx.telegram.sendMessage(referrerId, 
+          `New referral! ${ctx.from.first_name}.`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (error) {
+        console.log('Could not notify referrer:', error.message);
+      }
+    }
+
+    // Fetch user data
+    const userSnap = await userRef.once('value');
+    const userData = userSnap.val();
+
+    const referralSnap = await db.ref(`referrals/${currentUserId}`).once('value');
+    let referredCount = 0;
+    let referralEarnings = 0;
+
+    if (referralSnap.exists()) {
+      const refData = referralSnap.val();
+      referredCount = refData.referredCount || 0;
+      referralEarnings = refData.referralEarnings || 0;
+    }
+
+    let welcomeMessage = `👋 <b>Hi ${ctx.from.first_name}!</b>\n`;
+
+    if (referrerId && referrerId !== currentUserId && isNewUser) {
+      welcomeMessage += `Referred by a friend! Start earning now!`;
+    } else if (isNewUser) {
+      welcomeMessage += `Invite friends & earn 10% of their earnings!`;
+    }
+
+    await ctx.reply(welcomeMessage, { parse_mode: 'HTML' });
+
+  } catch (error) {
+    console.error('Error in start command:', error);
+    await ctx.reply('❌ An error occurred. Please try again.');
+  }
+});
+
+// Add referral earnings manually (Admin only)
+bot.command('addreferral', async (ctx) => {
+  const args = ctx.message.text.split(' '); // /addreferral <userId> <amount>
+  if (args.length < 3) return ctx.reply('Usage: /addreferral <userId> <amount>');
+
+  const userId = args[1];
+  const amount = parseFloat(args[2]);
+  if (isNaN(amount)) return ctx.reply('Invalid amount');
+
+  const referralRef = db.ref(`referrals/${userId}`);
+  const referralSnap = await referralRef.once('value');
+  let referralEarnings = 0;
+  if (referralSnap.exists()) referralEarnings = referralSnap.val().referralEarnings || 0;
+});
+
+// Error handling
+bot.catch((err, ctx) => {
+  console.error(`Error for ${ctx.updateType}:`, err);
+});
+
 // Helper function to clean old connections
 function cleanOldConnections() {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -58,6 +202,8 @@ function updateConnectionLastSeen(connectionId) {
         connection.lastSeen = new Date().toISOString();
     }
 }
+
+// Express Routes
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -174,7 +320,7 @@ app.post('/api/telegram/check-membership', async (req, res) => {
             updateConnectionLastSeen(connectionId);
         }
 
-        // Get Telegram Bot Token from environment
+        // Use the same bot token
         const botToken = "7997214783:AAG8mwdPox1urOKx4GAO3Lk9xUOzrAMJiV0";
         if (!botToken) {
             console.error('❌ Telegram Bot Token not configured');
@@ -333,7 +479,7 @@ app.get('/api/health', (req, res) => {
                 heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024) + ' MB'
             },
             environment: process.env.NODE_ENV || 'development',
-            telegram_bot_configured: !!process.env.TELEGRAM_BOT_TOKEN
+            telegram_bot_configured: true
         };
 
         res.json(healthInfo);
@@ -421,12 +567,12 @@ app.use('*', (req, res) => {
     });
 });
 
-// Start server
+// Start both bot and server
 const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('\n🚀 Tasks Backend Server started successfully!');
     console.log(`📍 Server running on: http://localhost:${PORT}`);
     console.log(`🌐 Frontend URL: ${FRONTEND_URL}`);
-    console.log(`🤖 Telegram Bot: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Configured' : '❌ Not configured'}`);
+    console.log(`🤖 Telegram Bot: ✅ Configured`);
     console.log('\n📋 Available endpoints:');
     console.log('   GET  /              - Server info');
     console.log('   GET  /api/test      - Test connection');
@@ -434,25 +580,24 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('   GET  /api/connections - Connection statistics');
     console.log('   POST /api/frontend/connect - Register frontend');
     console.log('   POST /api/telegram/check-membership - Check Telegram membership');
-    console.log('\n🔗 Testing connection to frontend...');
-    
-    // Test frontend connection
-    axios.get(`${FRONTEND_URL}`)
-        .then(() => console.log('✅ Frontend is accessible'))
-        .catch(() => console.log('⚠️  Frontend might not be accessible'));
 });
 
+// Start bot
+bot.launch().then(() => console.log('🤖 Telegram Bot is running...'));
+
 // Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('🛑 Received SIGTERM, shutting down gracefully...');
+process.once('SIGINT', () => {
+    console.log('🛑 Received SIGINT, shutting down gracefully...');
+    bot.stop('SIGINT');
     server.close(() => {
         console.log('✅ Server closed');
         process.exit(0);
     });
 });
 
-process.on('SIGINT', () => {
-    console.log('🛑 Received SIGINT, shutting down gracefully...');
+process.once('SIGTERM', () => {
+    console.log('🛑 Received SIGTERM, shutting down gracefully...');
+    bot.stop('SIGTERM');
     server.close(() => {
         console.log('✅ Server closed');
         process.exit(0);
@@ -471,6 +616,3 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 module.exports = app;
-
-
-
