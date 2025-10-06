@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Your frontend URL
-const FRONTEND_URL = 'https://178ql44r-5173.asse.devtunnels.ms';
+const FRONTEND_URL = 'https://primev1.vercel.app';
 
 // Middleware
 app.use(cors({
@@ -471,5 +471,6 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 module.exports = app;
+
 
 
