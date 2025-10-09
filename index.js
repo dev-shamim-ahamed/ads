@@ -7,12 +7,14 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Your frontend URL
+// URLs configuration
 const FRONTEND_URL = 'https://primev1.vercel.app';
+const ADMIN_URL = 'https://primev1admin.vercel.app/';
+const DASHBOARD_URL = 'https://primev1.vercel.app';
 
 // Middleware
 app.use(cors({
-    origin: [FRONTEND_URL, 'http://localhost:5173'],
+    origin: [FRONTEND_URL, ADMIN_URL, 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -33,7 +35,6 @@ async function getData(path) {
     const res = await axios.get(`${FIREBASE_DB_URL}/${path}.json`);
     return res.data;
   } catch (err) {
-    console.error('Firebase GET error:', err.message);
     return null;
   }
 }
@@ -42,7 +43,7 @@ async function setData(path, data) {
   try {
     await axios.put(`${FIREBASE_DB_URL}/${path}.json`, data);
   } catch (err) {
-    console.error('Firebase SET error:', err.message);
+    console.log('Firebase error');
   }
 }
 
@@ -50,7 +51,7 @@ async function updateData(path, data) {
   try {
     await axios.patch(`${FIREBASE_DB_URL}/${path}.json`, data);
   } catch (err) {
-    console.error('Firebase UPDATE error:', err.message);
+    console.log('Firebase update error');
   }
 }
 
@@ -60,15 +61,13 @@ const bot = new Telegraf(BOT_TOKEN);
 
 // --- Telegram Bot Commands ---
 
-// Start Command
+// Start Command - Opens dashboard
 bot.start(async (ctx) => {
   try {
     const messageText = ctx.message.text;
     const args = messageText.split(' ');
     const referrerId = args[1] || null;
     const currentUserId = String(ctx.from.id);
-
-    console.log(`Start command received from ${currentUserId}, referrer: ${referrerId}`);
 
     // Check if user exists
     let userData = await getData(`users/${currentUserId}`);
@@ -90,15 +89,10 @@ bot.start(async (ctx) => {
         tasksCompleted: {},
         referredBy: referrerId || null
       });
-      console.log(`New user created: ${currentUserId}`);
-    } else {
-      console.log(`Existing user: ${currentUserId}`);
     }
 
     // Handle referral system
     if (referrerId && referrerId !== currentUserId && isNewUser) {
-      console.log(`Processing referral for new user ${currentUserId} referred by ${referrerId}`);
-
       await setData(`referrals/${referrerId}/referredUsers/${currentUserId}`, {
         joinedAt: new Date().toISOString(),
         bonusGiven: false
@@ -115,33 +109,31 @@ bot.start(async (ctx) => {
         referralEarnings: referralEarnings
       });
 
-      console.log(`Referral recorded: ${currentUserId} referred by ${referrerId}`);
-
       // Notify referrer
       try {
         await ctx.telegram.sendMessage(referrerId, `🎉 New referral! ${ctx.from.first_name}.`, { parse_mode: 'HTML' });
-      } catch (error) {
-        console.log('Could not notify referrer:', error.message);
+      } catch (error) {}
+    }
+
+    // Send dashboard message with button
+    const welcomeMessage = `👋 <b>Welcome ${ctx.from.first_name}!</b>\n\n` +
+                          `Click the button below to open your dashboard and start earning:`;
+
+    await ctx.reply(welcomeMessage, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '🚀 Open Dashboard',
+              url: DASHBOARD_URL
+            }
+          ]
+        ]
       }
-    }
-
-    // Fetch user referral stats
-    const referralSnap = await getData(`referrals/${currentUserId}`) || {};
-    let referredCount = referralSnap.referredCount || 0;
-    let referralEarnings = referralSnap.referralEarnings || 0;
-
-    let welcomeMessage = `👋 <b>Hi ${ctx.from.first_name}!</b>\n`;
-
-    if (referrerId && referrerId !== currentUserId && isNewUser) {
-      welcomeMessage += `Referred by a friend! Start earning now!`;
-    } else if (isNewUser) {
-      welcomeMessage += `Invite friends & earn 10% of their earnings!`;
-    }
-
-    await ctx.reply(welcomeMessage, { parse_mode: 'HTML' });
+    });
 
   } catch (error) {
-    console.error('Error in start command:', error);
     await ctx.reply('❌ An error occurred. Please try again.');
   }
 });
@@ -149,7 +141,7 @@ bot.start(async (ctx) => {
 // Add referral earnings manually (Admin only)
 bot.command('addreferral', async (ctx) => {
   try {
-    const args = ctx.message.text.split(' '); // /addreferral <userId> <amount>
+    const args = ctx.message.text.split(' ');
     if (args.length < 3) return ctx.reply('Usage: /addreferral <userId> <amount>');
 
     const userId = args[1];
@@ -165,38 +157,20 @@ bot.command('addreferral', async (ctx) => {
 
     await ctx.reply(`✅ Added ${amount} to referral earnings of user ${userId}`);
   } catch (err) {
-    console.error('Error in addreferral command:', err);
     await ctx.reply('❌ Failed to add referral earnings.');
   }
 });
 
 // --- Express Server Routes ---
 
-// Enhanced logging middleware
-app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`, {
-        ip: req.ip || req.connection.remoteAddress,
-        userAgent: req.get('User-Agent')?.substring(0, 100),
-        origin: req.get('Origin')
-    });
-    next();
-});
-
 // Helper function to clean old connections
 function cleanOldConnections() {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const initialLength = frontendConnections.length;
-    
     for (let i = frontendConnections.length - 1; i >= 0; i--) {
         const lastSeen = new Date(frontendConnections[i].lastSeen);
         if (lastSeen < fiveMinutesAgo) {
             frontendConnections.splice(i, 1);
         }
-    }
-    
-    if (initialLength !== frontendConnections.length) {
-        console.log(`🧹 Cleaned ${initialLength - frontendConnections.length} old connections`);
     }
 }
 
@@ -213,27 +187,16 @@ app.get('/', (req, res) => {
     res.json({
         message: 'Telegram Bot & Tasks Backend Server is running!',
         timestamp: new Date().toISOString(),
-        version: '1.0.0',
-        frontendUrl: FRONTEND_URL,
-        endpoints: {
-            test: '/api/test',
-            health: '/api/health',
-            connections: '/api/connections',
-            frontendConnect: '/api/frontend/connect',
-            telegramCheck: '/api/telegram/check-membership'
-        }
+        version: '1.0.0'
     });
 });
 
 // Test endpoint
 app.get('/api/test', (req, res) => {
-    console.log('✅ Test endpoint called from:', req.get('Origin'));
     res.json({
         success: true,
         message: 'Server is running and connected to frontend!',
-        timestamp: new Date().toISOString(),
-        frontendUrl: FRONTEND_URL,
-        serverUrl: `http://localhost:${PORT}`
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -260,37 +223,20 @@ app.post('/api/frontend/connect', (req, res) => {
             lastSeen: new Date().toISOString()
         };
 
-        // Add to connections list
         frontendConnections.push(connectionInfo);
         
-        // Keep only recent connections if over limit
         if (frontendConnections.length > MAX_CONNECTIONS) {
             frontendConnections.splice(0, frontendConnections.length - MAX_CONNECTIONS);
         }
-
-        // Log the connection
-        const userInfo = userData ? 
-            `@${userData.username || 'unknown'} (${userData.telegramId || 'unknown'})` : 
-            'Anonymous';
-        
-        console.log('🎯 Frontend Connected:', {
-            connectionId,
-            user: userInfo,
-            origin: origin,
-            frontendVersion,
-            totalConnections: frontendConnections.length
-        });
 
         res.json({
             success: true,
             message: 'Frontend connection registered successfully',
             connectionId: connectionId,
-            serverTime: new Date().toISOString(),
-            frontendUrl: FRONTEND_URL
+            serverTime: new Date().toISOString()
         });
 
     } catch (error) {
-        console.error('❌ Error in frontend connection:', error);
         res.status(500).json({
             success: false,
             error: 'Internal server error'
@@ -301,16 +247,13 @@ app.post('/api/frontend/connect', (req, res) => {
 // Function to check Telegram channel membership
 async function checkTelegramChannelMembership(botToken, userId, channel) {
     try {
-        // Remove @ symbol if present and clean the channel name
         const cleanChannel = channel.replace('@', '').trim();
         
-        // Try different formats for chat_id
         const chatIdFormats = [
             `@${cleanChannel}`,
             cleanChannel
         ];
 
-        // If channel is numeric, try as supergroup ID
         if (/^\d+$/.test(cleanChannel)) {
             chatIdFormats.push(`-100${cleanChannel}`);
         }
@@ -321,38 +264,26 @@ async function checkTelegramChannelMembership(botToken, userId, channel) {
             try {
                 const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
                 
-                console.log(`🔄 Trying chat_id format: ${chatId}`);
-                
                 const response = await axios.get(url, {
                     params: {
                         chat_id: chatId,
                         user_id: userId
                     },
-                    timeout: 15000 // 15 second timeout
+                    timeout: 15000
                 });
 
                 if (response.data.ok) {
                     const status = response.data.result.status;
                     const isMember = ['member', 'administrator', 'creator', 'restricted'].includes(status);
-                    
-                    console.log(`✅ Membership check successful:`, {
-                        chatId,
-                        status,
-                        isMember
-                    });
-                    
                     return isMember;
                 } else {
                     lastError = new Error(`Telegram API error: ${response.data.description}`);
                 }
             } catch (formatError) {
                 lastError = formatError;
-                console.log(`❌ Failed with chat_id ${chatId}:`, formatError.message);
-                // Continue to next format
             }
         }
 
-        // If all formats failed, throw the last error
         if (lastError) {
             throw lastError;
         }
@@ -360,14 +291,6 @@ async function checkTelegramChannelMembership(botToken, userId, channel) {
         return false;
 
     } catch (error) {
-        console.error('❌ Telegram API error:', {
-            message: error.message,
-            response: error.response?.data,
-            userId,
-            channel
-        });
-
-        // Handle specific Telegram API errors
         if (error.response?.data) {
             const telegramError = error.response.data;
             if (telegramError.error_code === 400) {
@@ -388,14 +311,6 @@ app.post('/api/telegram/check-membership', async (req, res) => {
     try {
         const { userId, username, channel, connectionId, taskId, taskName } = req.body;
 
-        console.log('🔍 Checking Telegram membership request:', {
-            userId,
-            username: username || 'unknown',
-            channel,
-            connectionId: connectionId || 'unknown',
-            origin: req.get('Origin')
-        });
-
         if (!userId || !channel) {
             return res.status(400).json({
                 success: false,
@@ -410,13 +325,6 @@ app.post('/api/telegram/check-membership', async (req, res) => {
 
         // Check membership using Telegram Bot API
         const isMember = await checkTelegramChannelMembership(BOT_TOKEN, userId, channel);
-        
-        console.log('📊 Membership check result:', {
-            userId,
-            channel,
-            isMember,
-            origin: req.get('Origin')
-        });
 
         res.json({
             success: true,
@@ -427,7 +335,6 @@ app.post('/api/telegram/check-membership', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Telegram membership check failed:', error);
         res.status(500).json({
             success: false,
             error: error.message || 'Failed to check Telegram membership',
@@ -436,27 +343,110 @@ app.post('/api/telegram/check-membership', async (req, res) => {
     }
 });
 
+// Send Telegram notification endpoint (Admin only)
+app.post('/api/send-notification', async (req, res) => {
+    try {
+        const { message, imageUrl, buttons } = req.body;
+
+        if (!message && !imageUrl) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Message or image required' 
+            });
+        }
+
+        // Fetch all users
+        const users = await getData('users');
+        if (!users) {
+            return res.status(404).json({
+                success: false,
+                error: 'No users found in database'
+            });
+        }
+
+        const chatIds = Object.values(users).map(u => u.telegramId).filter(id => id);
+
+        // Prepare reply markup if buttons are provided
+        const replyMarkup = buttons && buttons.length > 0
+            ? { 
+                inline_keyboard: [buttons.map(b => ({ 
+                    text: b.text, 
+                    url: b.url 
+                }))] 
+              }
+            : undefined;
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Send notifications to all users
+        for (const chat_id of chatIds) {
+            try {
+                if (imageUrl) {
+                    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                        chat_id,
+                        photo: imageUrl,
+                        caption: message || '',
+                        parse_mode: 'HTML',
+                        reply_markup: replyMarkup
+                    });
+                } else {
+                    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                        chat_id,
+                        text: message,
+                        parse_mode: 'HTML',
+                        reply_markup: replyMarkup
+                    });
+                }
+                successCount++;
+                
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+            } catch (err) {
+                failCount++;
+            }
+        }
+
+        const result = {
+            success: true,
+            message: `Notifications sent successfully`,
+            stats: {
+                totalUsers: chatIds.length,
+                successful: successCount,
+                failed: failCount
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        res.json(result);
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Failed to send notifications',
+            details: error.message
+        });
+    }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     try {
-        // Clean old connections first
         cleanOldConnections();
 
-        // Calculate active connections (last 5 minutes)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
         const activeConnections = frontendConnections.filter(conn => {
             const lastSeen = new Date(conn.lastSeen);
             return lastSeen > fiveMinutesAgo;
         });
 
-        // Get memory usage
         const memoryUsage = process.memoryUsage();
 
         const healthInfo = {
             status: 'healthy',
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),
-            frontendUrl: FRONTEND_URL,
             connections: {
                 total: frontendConnections.length,
                 active: activeConnections.length,
@@ -477,7 +467,6 @@ app.get('/api/health', (req, res) => {
         res.json(healthInfo);
 
     } catch (error) {
-        console.error('❌ Health check error:', error);
         res.status(500).json({
             status: 'unhealthy',
             error: error.message,
@@ -489,10 +478,8 @@ app.get('/api/health', (req, res) => {
 // Connections statistics endpoint
 app.get('/api/connections', (req, res) => {
     try {
-        // Clean old connections first
         cleanOldConnections();
 
-        // Calculate active connections (last 5 minutes)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
         const activeConnections = frontendConnections.filter(conn => {
             const lastSeen = new Date(conn.lastSeen);
@@ -509,7 +496,6 @@ app.get('/api/connections', (req, res) => {
             total_connections: frontendConnections.length,
             active_connections: activeConnections.length,
             unique_users: uniqueUsers.length,
-            frontend_url: FRONTEND_URL,
             connection_details: {
                 max_stored: MAX_CONNECTIONS,
                 cleanup_interval: '5 minutes'
@@ -531,7 +517,6 @@ app.get('/api/connections', (req, res) => {
         res.json(stats);
 
     } catch (error) {
-        console.error('❌ Connections endpoint error:', error);
         res.status(500).json({
             error: 'Failed to get connection statistics',
             details: error.message
@@ -541,7 +526,6 @@ app.get('/api/connections', (req, res) => {
 
 // Error handling middleware
 app.use((error, req, res, next) => {
-    console.error('🚨 Unhandled error:', error);
     res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -554,68 +538,48 @@ app.use('*', (req, res) => {
     res.status(404).json({
         success: false,
         error: 'Endpoint not found',
-        path: req.originalUrl,
-        frontendUrl: FRONTEND_URL
+        path: req.originalUrl
     });
 });
 
 // --- Bot Error handling ---
 bot.catch((err, ctx) => {
-    console.error(`Error for ${ctx.updateType}:`, err);
+    console.log('Bot error');
 });
 
 // --- Start Server and Bot ---
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n🚀 Combined Telegram Bot & Express Server started successfully!');
-    console.log(`📍 Server running on: http://localhost:${PORT}`);
-    console.log(`🌐 Frontend URL: ${FRONTEND_URL}`);
-    console.log(`🤖 Telegram Bot: ${BOT_TOKEN ? '✅ Configured' : '❌ Not configured'}`);
-    console.log('\n📋 Available endpoints:');
-    console.log('   GET  /              - Server info');
-    console.log('   GET  /api/test      - Test connection');
-    console.log('   GET  /api/health    - Health check');
-    console.log('   GET  /api/connections - Connection statistics');
-    console.log('   POST /api/frontend/connect - Register frontend');
-    console.log('   POST /api/telegram/check-membership - Check Telegram membership');
-    console.log('\n🤖 Telegram Bot Commands:');
-    console.log('   /start - Start the bot');
-    console.log('   /addreferral - Add referral earnings (Admin)');
+    console.log(`Server running on port ${PORT}`);
 });
 
 // Start the Telegram bot
 bot.launch().then(() => {
-    console.log('✅ Telegram Bot is now running!');
+    console.log('Telegram Bot started');
 }).catch(err => {
-    console.error('❌ Failed to start Telegram Bot:', err);
+    console.log('Failed to start Telegram Bot');
 });
 
 // --- Graceful shutdown ---
 process.once('SIGINT', () => {
-    console.log('🛑 Received SIGINT, shutting down gracefully...');
     bot.stop('SIGINT');
     server.close(() => {
-        console.log('✅ Server closed');
         process.exit(0);
     });
 });
 
 process.once('SIGTERM', () => {
-    console.log('🛑 Received SIGTERM, shutting down gracefully...');
     bot.stop('SIGTERM');
     server.close(() => {
-        console.log('✅ Server closed');
         process.exit(0);
     });
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-    console.error('🚨 Uncaught Exception:', error);
     process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
     process.exit(1);
 });
 
