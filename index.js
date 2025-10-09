@@ -111,14 +111,17 @@ bot.start(async (ctx) => {
 
       // Notify referrer
       try {
-        await ctx.telegram.sendMessage(referrerId, `🎉 New referral! ${ctx.from.first_name}.`, { parse_mode: 'HTML' });
-      } catch (error) {}
+        await ctx.telegram.sendMessage(referrerId, `🎉 New referral! ${ctx.from.first_name} joined using your link.`, { parse_mode: 'HTML' });
+      } catch (error) {
+        console.log('Could not notify referrer:', error.message);
+      }
     }
 
     // Send dashboard message with button
     const welcomeMessage = `👋 <b>Welcome ${ctx.from.first_name}!</b>\n\n` +
                           `Click the button below to open your dashboard and start earning:`;
 
+    // Option 1: Web App button (for Telegram Mini Apps)
     await ctx.reply(welcomeMessage, {
       parse_mode: 'HTML',
       reply_markup: {
@@ -126,7 +129,9 @@ bot.start(async (ctx) => {
           [
             {
               text: '🚀 Open Dashboard',
-              url: DASHBOARD_URL
+              web_app: {
+                url: DASHBOARD_URL
+              }
             }
           ]
         ]
@@ -134,6 +139,7 @@ bot.start(async (ctx) => {
     });
 
   } catch (error) {
+    console.error('Start command error:', error);
     await ctx.reply('❌ An error occurred. Please try again.');
   }
 });
