@@ -14,7 +14,7 @@ const DASHBOARD_URL = 'https://primev1.vercel.app';
 
 // Middleware
 app.use(cors({
-    origin: [FRONTEND_URL, ADMIN_URL, 'http://localhost:5173'],
+    origin: [FRONTEND_URL, ADMIN_URL, 'http://localhost:5173', 'http://localhost:3000'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -206,6 +206,177 @@ app.get('/api/test', (req, res) => {
     });
 });
 
+// Test bot token endpoint
+app.post('/api/test-notification', async (req, res) => {
+    try {
+        const { botToken } = req.body;
+        
+        if (!botToken) {
+            return res.status(400).json({
+                success: false,
+                error: 'Bot token is required for testing'
+            });
+        }
+
+        // Test the bot token by getting bot info
+        const testResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getMe`, {
+            timeout: 10000
+        });
+
+        res.json({
+            success: true,
+            message: 'Bot token is valid',
+            botInfo: testResponse.data.result
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            error: 'Invalid bot token',
+            details: error.response?.data?.description || error.message
+        });
+    }
+});
+
+// Send notification endpoint
+app.post('/api/send-notification', async (req, res) => {
+    try {
+        const { message, imageUrl, buttons, botToken } = req.body;
+
+        console.log('Received notification request:', { 
+            messageLength: message?.length, 
+            hasImage: !!imageUrl, 
+            buttonsCount: buttons?.length,
+            hasBotToken: !!botToken
+        });
+
+        if (!message && !imageUrl) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Message or image required' 
+            });
+        }
+
+        // Use the provided bot token or fall back to the hardcoded one
+        const tokenToUse = botToken || BOT_TOKEN;
+        
+        if (!tokenToUse) {
+            return res.status(400).json({
+                success: false,
+                error: 'Bot token is required'
+            });
+        }
+
+        // Fetch all users
+        const users = await getData('users');
+        if (!users) {
+            return res.status(404).json({
+                success: false,
+                error: 'No users found in database'
+            });
+        }
+
+        const chatIds = Object.values(users)
+            .map(u => u.telegramId)
+            .filter(id => id && id !== 'undefined');
+
+        console.log(`Sending to ${chatIds.length} users`);
+
+        // Prepare reply markup if buttons are provided
+        let replyMarkup = undefined;
+        if (buttons && buttons.length > 0) {
+            // Filter out empty buttons
+            const validButtons = buttons.filter(btn => btn.text && btn.url);
+            if (validButtons.length > 0) {
+                replyMarkup = {
+                    inline_keyboard: [validButtons.map(b => ({ 
+                        text: b.text.substring(0, 64), // Limit text length
+                        url: b.url 
+                    }))]
+                };
+            }
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+        const errors = [];
+
+        // Send notifications to all users with better error handling
+        for (const chat_id of chatIds) {
+            try {
+                if (imageUrl) {
+                    await axios.post(`https://api.telegram.org/bot${tokenToUse}/sendPhoto`, {
+                        chat_id,
+                        photo: imageUrl,
+                        caption: message ? message.substring(0, 1024) : '', // Limit caption length
+                        parse_mode: 'HTML',
+                        reply_markup: replyMarkup
+                    }, {
+                        timeout: 10000
+                    });
+                } else {
+                    await axios.post(`https://api.telegram.org/bot${tokenToUse}/sendMessage`, {
+                        chat_id,
+                        text: message.substring(0, 4096), // Limit message length
+                        parse_mode: 'HTML',
+                        reply_markup: replyMarkup,
+                        disable_web_page_preview: true
+                    }, {
+                        timeout: 10000
+                    });
+                }
+                successCount++;
+                
+                // Small delay to avoid rate limiting (10 messages per second)
+                await new Promise(resolve => setTimeout(resolve, 150));
+                
+            } catch (err) {
+                failCount++;
+                const errorMsg = err.response?.data?.description || err.message;
+                errors.push(`User ${chat_id}: ${errorMsg}`);
+                
+                // If it's a bot token error, break early
+                if (err.response?.data?.error_code === 401) {
+                    errors.push('INVALID_BOT_TOKEN');
+                    break;
+                }
+            }
+        }
+
+        const result = {
+            success: true,
+            sentTo: successCount,
+            message: `Notifications sent: ${successCount} successful, ${failCount} failed`,
+            stats: {
+                totalUsers: chatIds.length,
+                successful: successCount,
+                failed: failCount
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        // If all failed due to bot token, return specific error
+        if (successCount === 0 && errors.some(e => e.includes('INVALID_BOT_TOKEN'))) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid bot token. Please check your bot token in the admin panel.',
+                details: 'The bot token provided is not valid or the bot has been deleted.'
+            });
+        }
+
+        console.log('Notification result:', result);
+        res.json(result);
+
+    } catch (error) {
+        console.error('Notification error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to send notifications',
+            details: error.message
+        });
+    }
+});
+
 // Frontend connection registration endpoint
 app.post('/api/frontend/connect', (req, res) => {
     try {
@@ -345,93 +516,6 @@ app.post('/api/telegram/check-membership', async (req, res) => {
             success: false,
             error: error.message || 'Failed to check Telegram membership',
             isMember: false
-        });
-    }
-});
-
-// Send Telegram notification endpoint (Admin only)
-app.post('/api/send-notification', async (req, res) => {
-    try {
-        const { message, imageUrl, buttons } = req.body;
-
-        if (!message && !imageUrl) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Message or image required' 
-            });
-        }
-
-        // Fetch all users
-        const users = await getData('users');
-        if (!users) {
-            return res.status(404).json({
-                success: false,
-                error: 'No users found in database'
-            });
-        }
-
-        const chatIds = Object.values(users).map(u => u.telegramId).filter(id => id);
-
-        // Prepare reply markup if buttons are provided
-        const replyMarkup = buttons && buttons.length > 0
-            ? { 
-                inline_keyboard: [buttons.map(b => ({ 
-                    text: b.text, 
-                    url: b.url 
-                }))] 
-              }
-            : undefined;
-
-        let successCount = 0;
-        let failCount = 0;
-
-        // Send notifications to all users
-        for (const chat_id of chatIds) {
-            try {
-                if (imageUrl) {
-                    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                        chat_id,
-                        photo: imageUrl,
-                        caption: message || '',
-                        parse_mode: 'HTML',
-                        reply_markup: replyMarkup
-                    });
-                } else {
-                    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                        chat_id,
-                        text: message,
-                        parse_mode: 'HTML',
-                        reply_markup: replyMarkup
-                    });
-                }
-                successCount++;
-                
-                // Small delay to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
-            } catch (err) {
-                failCount++;
-            }
-        }
-
-        const result = {
-            success: true,
-            message: `Notifications sent successfully`,
-            stats: {
-                totalUsers: chatIds.length,
-                successful: successCount,
-                failed: failCount
-            },
-            timestamp: new Date().toISOString()
-        };
-
-        res.json(result);
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: 'Failed to send notifications',
-            details: error.message
         });
     }
 });
