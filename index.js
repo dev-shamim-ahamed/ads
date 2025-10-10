@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3001;
 
 // URLs configuration
 const FRONTEND_URL = 'https://primev1.vercel.app';
-const ADMIN_URL = 'https://primev1admin.vercel.app/';
+const ADMIN_URL = 'https://primev1admin.vercel.app';
 const DASHBOARD_URL = 'https://primev1.vercel.app';
 
 // Middleware
@@ -674,3 +674,4 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 module.exports = app;
+
